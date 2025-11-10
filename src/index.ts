@@ -54,6 +54,11 @@ interface EmailContent {
     html: string;
 }
 
+interface LabelModificationRequest {
+    addLabelIds?: string[];
+    removeLabelIds?: string[];
+}
+
 // OAuth2 configuration
 let oauth2Client: OAuth2Client;
 
@@ -323,7 +328,7 @@ async function main() {
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
 
-        async function handleEmailAction(action: "send" | "draft", validatedArgs: any) {
+        async function handleEmailAction(action: "send" | "draft", validatedArgs: z.infer<typeof SendEmailSchema>) {
             const message = createEmailMessage(validatedArgs);
 
             const encodedMessage = Buffer.from(message).toString('base64')
@@ -512,9 +517,9 @@ async function main() {
                 // Updated implementation for the modify_email handler
                 case "modify_email": {
                     const validatedArgs = ModifyEmailSchema.parse(args);
-                    
+
                     // Prepare request body
-                    const requestBody: any = {};
+                    const requestBody: LabelModificationRequest = {};
                     
                     if (validatedArgs.labelIds) {
                         requestBody.addLabelIds = validatedArgs.labelIds;
@@ -602,9 +607,9 @@ async function main() {
                     const validatedArgs = BatchModifyEmailsSchema.parse(args);
                     const messageIds = validatedArgs.messageIds;
                     const batchSize = validatedArgs.batchSize || 50;
-                    
+
                     // Prepare request body
-                    const requestBody: any = {};
+                    const requestBody: LabelModificationRequest = {};
                     
                     if (validatedArgs.addLabelIds) {
                         requestBody.addLabelIds = validatedArgs.addLabelIds;
@@ -705,12 +710,13 @@ async function main() {
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             return {
                 content: [
                     {
                         type: "text",
-                        text: `Error: ${error.message}`,
+                        text: `Error executing tool '${name}': ${errorMessage}`,
                     },
                 ],
             };
