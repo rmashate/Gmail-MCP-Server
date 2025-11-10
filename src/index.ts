@@ -142,8 +142,25 @@ async function loadCredentials() {
 }
 
 async function authenticate() {
+    // Extract the callback URL and port
+    const callbackUrl = process.argv[2] === 'auth' && process.argv[3]
+        ? process.argv[3]
+        : "http://localhost:3000/oauth2callback";
+
+    // Parse the port from the callback URL
+    let port = 3000; // Default port
+    try {
+        const urlObj = new URL(callbackUrl);
+        const urlPort = urlObj.port;
+        if (urlPort) {
+            port = parseInt(urlPort, 10);
+        }
+    } catch (error) {
+        console.warn('Warning: Could not parse callback URL, using default port 3000');
+    }
+
     const server = http.createServer();
-    server.listen(3000);
+    server.listen(port);
 
     return new Promise<void>((resolve, reject) => {
         const authUrl = oauth2Client.generateAuthUrl({
@@ -157,7 +174,7 @@ async function authenticate() {
         server.on('request', async (req, res) => {
             if (!req.url?.startsWith('/oauth2callback')) return;
 
-            const url = new URL(req.url, 'http://localhost:3000');
+            const url = new URL(req.url, callbackUrl);
             const code = url.searchParams.get('code');
 
             if (!code) {
